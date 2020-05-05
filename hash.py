@@ -101,6 +101,59 @@ def update_hash(hash_obj, file_root, file_path):
             hash_obj.update(data)
 
 
+def get_abs_dirname(p):
+    """
+    Returns an absolute dirname, even if a file has been provided
+
+    """
+
+    p = os.path.abspath(p)
+    if os.path.isfile(p):
+        return os.path.basename(p)
+
+    return p
+
+
+def build_relative_path(a, b):
+    """
+    Returns a relative path of a compared to b
+
+    """
+
+    aa = get_abs_dirname(a)
+    ba = get_abs_dirname(b)
+    if aa == ba:
+        # same directory: return the given path
+        return a
+
+    aelem = aa.split('/')
+    belem = ba.split('/')
+    selem = []
+    for e in aelem:
+        if e != belem[len(selem)]:
+            break
+
+        selem.append(e)
+
+    if len(selem) < 2:
+        # only the first / is the same => there is no relative path
+        # so we use the absolute path
+        return aa
+
+    # calculate the remaining path elements of b
+    s = '/'.join(selem)
+    rem = ba.replace(s, "")
+    rem = rem.replace('/', '', 1)
+    relem = rem.split('/')
+
+    # go back
+    rel_path = ""
+    for e in relem:
+        rel_path = '{}../'.format(rel_path)
+
+    return '{}{}'.format(rel_path, a)
+
+
 # Parse the query.
 query = json.load(sys.stdin)
 build_command = query['build_command']
@@ -113,6 +166,14 @@ source_path = os.path.abspath(query['source_path'])
 if not source_path:
     abort('source_path must be set.')
 
+# use relative paths for hash calculation
+hash_dirs = []
+for dir in [query['source_path']] + build_paths:
+    hash_dirs.append(build_relative_path(dir, module_relpath))
+
+# distinct list (for the case that build script is in the same dir as the function)
+hash_dirs = list(set(hash_dirs))
+
 # Change working directory to the module path
 # so references to build.py will work.
 os.chdir(module_relpath)
@@ -120,7 +181,7 @@ os.chdir(module_relpath)
 # Generate a hash based on file names and content. Also use the
 # runtime value, build command, and content of the build paths
 # because they can have an effect on the resulting archive.
-content_hash = generate_content_hash([source_path] + build_paths)
+content_hash = generate_content_hash(hash_dirs)
 content_hash.update(runtime.encode())
 content_hash.update(build_command.encode())
 
