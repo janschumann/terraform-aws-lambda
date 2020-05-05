@@ -168,10 +168,12 @@ if not source_path:
 
 # use relative paths for hash calculation
 hash_dirs = []
-for dir in [query['source_path']] + build_paths:
+final_source_path = build_relative_path(query['source_path'], module_relpath)
+for dir in build_paths:
     hash_dirs.append(build_relative_path(dir, module_relpath))
 
 # distinct list (for the case that build script is in the same dir as the function)
+hash_dirs = [final_source_path] + hash_dirs
 hash_dirs = list(set(hash_dirs))
 
 # Change working directory to the module path
@@ -194,7 +196,7 @@ filename = 'builds/{content_hash}.zip'.format(
 replacements = {
     '$filename': filename,
     '$runtime': runtime,
-    '$source': source_path,
+    '$source': final_source_path,
 }
 for old, new in replacements.items():
     build_command = build_command.replace(old, new)
